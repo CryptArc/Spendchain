@@ -14,7 +14,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	cmn "github.com/tendermint/tendermint/libs/common"
 	tmtypes "github.com/tendermint/tendermint/types"
 
 	"github.com/cosmos/gaia/app"
@@ -23,6 +22,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keys"
 	"github.com/cosmos/cosmos-sdk/server"
+	"github.com/cosmos/cosmos-sdk/simapp"
 	"github.com/cosmos/cosmos-sdk/tests"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth"
@@ -45,16 +45,23 @@ const (
 )
 
 var (
-	startCoins = sdk.Coins{
-		sdk.NewCoin(feeDenom, sdk.TokensFromConsensusPower(1000000)),
+	totalCoins = sdk.NewCoins(
+		sdk.NewCoin(fee2Denom, sdk.TokensFromConsensusPower(2000000)),
+		sdk.NewCoin(feeDenom, sdk.TokensFromConsensusPower(2000000)),
+		sdk.NewCoin(fooDenom, sdk.TokensFromConsensusPower(2000)),
+		sdk.NewCoin(denom, sdk.TokensFromConsensusPower(300).Add(sdk.NewInt(12))), // add coins from inflation
+	)
+
+	startCoins = sdk.NewCoins(
 		sdk.NewCoin(fee2Denom, sdk.TokensFromConsensusPower(1000000)),
+		sdk.NewCoin(feeDenom, sdk.TokensFromConsensusPower(1000000)),
 		sdk.NewCoin(fooDenom, sdk.TokensFromConsensusPower(1000)),
 		sdk.NewCoin(denom, sdk.TokensFromConsensusPower(150)),
-	}
+	)
 
-	vestingCoins = sdk.Coins{
+	vestingCoins = sdk.NewCoins(
 		sdk.NewCoin(feeDenom, sdk.TokensFromConsensusPower(500000)),
-	}
+	)
 )
 
 //___________________________________________________________________________________
@@ -112,12 +119,12 @@ func (f Fixtures) GenesisFile() string {
 }
 
 // GenesisFile returns the application's genesis state
-func (f Fixtures) GenesisState() app.GenesisState {
+func (f Fixtures) GenesisState() simapp.GenesisState {
 	cdc := codec.New()
 	genDoc, err := tmtypes.GenesisDocFromFile(f.GenesisFile())
 	require.NoError(f.T, err)
 
-	var appState app.GenesisState
+	var appState simapp.GenesisState
 	require.NoError(f.T, cdc.UnmarshalJSON(genDoc.AppState, &appState))
 	return appState
 }
@@ -150,6 +157,7 @@ func InitFixtures(t *testing.T) (f *Fixtures) {
 
 	f.CLIConfig("chain-id", f.ChainID)
 	f.CLIConfig("broadcast-mode", "block")
+	f.CLIConfig("trust-node", "true")
 
 	// start an account with tokens
 	f.AddGenesisAccount(f.KeyAddress(keyFoo), startCoins)
@@ -311,14 +319,6 @@ func (f *Fixtures) CLIConfig(key, value string, flags ...string) {
 func (f *Fixtures) TxSend(from string, to sdk.AccAddress, amount sdk.Coin, flags ...string) (bool, string, string) {
 	cmd := fmt.Sprintf("%s tx send %s %s %s %v", f.GaiacliBinary, from, to, amount, f.Flags())
 	return executeWriteRetStdStreams(f.T, addFlags(cmd, flags), client.DefaultKeyPass)
-}
-
-func (f *Fixtures) txSendWithConfirm(
-	from string, to sdk.AccAddress, amount sdk.Coin, confirm string, flags ...string,
-) (bool, string, string) {
-
-	cmd := fmt.Sprintf("%s tx send %s %s %s %v", f.GaiacliBinary, from, to, amount, f.Flags())
-	return executeWriteRetStdStreams(f.T, addFlags(cmd, flags), confirm, client.DefaultKeyPass)
 }
 
 // TxSign is gaiacli tx sign
@@ -555,7 +555,7 @@ func (f *Fixtures) QueryGovParamTallying() gov.TallyParams {
 func (f *Fixtures) QueryGovProposals(flags ...string) gov.Proposals {
 	cmd := fmt.Sprintf("%s query gov proposals %v", f.GaiacliBinary, f.Flags())
 	stdout, stderr := tests.ExecuteT(f.T, addFlags(cmd, flags), "")
-	if strings.Contains(stderr, "No matching proposals found") {
+	if strings.Contains(stderr, "no matching proposals found") {
 		return gov.Proposals{}
 	}
 	require.Empty(f.T, stderr)
@@ -651,9 +651,9 @@ func (f *Fixtures) QuerySlashingParams() slashing.Params {
 //___________________________________________________________________________________
 // query distribution
 
-// QuerySigningInfo returns the signing info for a validator
+// QueryRewards returns the rewards of a delegator
 func (f *Fixtures) QueryRewards(delAddr sdk.AccAddress, flags ...string) distribution.QueryDelegatorTotalRewardsResponse {
-	cmd := fmt.Sprintf("%s query distr rewards %s %s", f.GaiacliBinary, delAddr, f.Flags())
+	cmd := fmt.Sprintf("%s query distribution rewards %s %s", f.GaiacliBinary, delAddr, f.Flags())
 	res, errStr := tests.ExecuteT(f.T, cmd, "")
 	require.Empty(f.T, errStr)
 	cdc := app.MakeCodec()
@@ -661,6 +661,32 @@ func (f *Fixtures) QueryRewards(delAddr sdk.AccAddress, flags ...string) distrib
 	err := cdc.UnmarshalJSON([]byte(res), &rewards)
 	require.NoError(f.T, err)
 	return rewards
+}
+
+//___________________________________________________________________________________
+// query supply
+
+// QueryTotalSupply returns the total supply of coins
+func (f *Fixtures) QueryTotalSupply(flags ...string) (totalSupply sdk.Coins) {
+	cmd := fmt.Sprintf("%s query supply total %s", f.GaiacliBinary, f.Flags())
+	res, errStr := tests.ExecuteT(f.T, cmd, "")
+	require.Empty(f.T, errStr)
+	cdc := app.MakeCodec()
+	err := cdc.UnmarshalJSON([]byte(res), &totalSupply)
+	require.NoError(f.T, err)
+	return totalSupply
+}
+
+// QueryTotalSupplyOf returns the total supply of a given coin denom
+func (f *Fixtures) QueryTotalSupplyOf(denom string, flags ...string) sdk.Int {
+	cmd := fmt.Sprintf("%s query supply total %s %s", f.GaiacliBinary, denom, f.Flags())
+	res, errStr := tests.ExecuteT(f.T, cmd, "")
+	require.Empty(f.T, errStr)
+	cdc := app.MakeCodec()
+	var supplyOf sdk.Int
+	err := cdc.UnmarshalJSON([]byte(res), &supplyOf)
+	require.NoError(f.T, err)
+	return supplyOf
 }
 
 //___________________________________________________________________________________
@@ -692,10 +718,10 @@ func executeWriteRetStdStreams(t *testing.T, cmdStr string, writes ...string) (b
 
 	// Log output.
 	if len(stdout) > 0 {
-		t.Log("Stdout:", cmn.Green(string(stdout)))
+		t.Log("Stdout:", string(stdout))
 	}
 	if len(stderr) > 0 {
-		t.Log("Stderr:", cmn.Red(string(stderr)))
+		t.Log("Stderr:", string(stderr))
 	}
 
 	// Wait for process to exit

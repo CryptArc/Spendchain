@@ -123,7 +123,7 @@ func queryCmd(cdc *amino.Codec) *cobra.Command {
 		client.LineBreak,
 		rpc.ValidatorCommand(cdc),
 		rpc.BlockCommand(),
-		authcmd.QueryTxsByTagsCmd(cdc),
+		authcmd.QueryTxsByEventsCmd(cdc),
 		authcmd.QueryTxCmd(cdc),
 		client.LineBreak,
 	)
@@ -148,6 +148,7 @@ func txCmd(cdc *amino.Codec) *cobra.Command {
 		client.LineBreak,
 		authcmd.GetBroadcastCommand(cdc),
 		authcmd.GetEncodeCommand(cdc),
+		authcmd.GetDecodeCommand(cdc),
 		client.LineBreak,
 	)
 

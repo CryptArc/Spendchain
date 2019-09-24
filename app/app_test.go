@@ -5,10 +5,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/tendermint/tendermint/libs/db"
 	"github.com/tendermint/tendermint/libs/log"
+	db "github.com/tendermint/tm-db"
 
 	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/cosmos-sdk/simapp"
 
 	abci "github.com/tendermint/tendermint/abci/types"
 )
@@ -24,9 +25,18 @@ func TestGaiadExport(t *testing.T) {
 	require.NoError(t, err, "ExportAppStateAndValidators should not have an error")
 }
 
-func setGenesis(gapp *GaiaApp) error {
+// ensure that black listed addresses are properly set in bank keeper
+func TestBlackListedAddrs(t *testing.T) {
+	db := db.NewMemDB()
+	gapp := NewGaiaApp(log.NewTMLogger(log.NewSyncWriter(os.Stdout)), db, nil, true, 0)
 
-	genesisState := NewDefaultGenesisState()
+	for acc := range maccPerms {
+		require.True(t, gapp.bankKeeper.BlacklistedAddr(gapp.supplyKeeper.GetModuleAddress(acc)))
+	}
+}
+
+func setGenesis(gapp *GaiaApp) error {
+	genesisState := simapp.NewDefaultGenesisState()
 	stateBytes, err := codec.MarshalJSONIndent(gapp.cdc, genesisState)
 	if err != nil {
 		return err
@@ -39,6 +49,7 @@ func setGenesis(gapp *GaiaApp) error {
 			AppStateBytes: stateBytes,
 		},
 	)
+
 	gapp.Commit()
 	return nil
 }

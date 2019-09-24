@@ -11,10 +11,10 @@ import (
 	"github.com/spf13/cobra"
 
 	abci "github.com/tendermint/tendermint/abci/types"
-	bcm "github.com/tendermint/tendermint/blockchain"
 	cmn "github.com/tendermint/tendermint/libs/common"
 	"github.com/tendermint/tendermint/proxy"
 	tmsm "github.com/tendermint/tendermint/state"
+	tmstore "github.com/tendermint/tendermint/store"
 	tm "github.com/tendermint/tendermint/types"
 
 	"github.com/cosmos/gaia/app"
@@ -92,7 +92,7 @@ func replayTxs(rootDir string) error {
 
 	// Application
 	fmt.Fprintln(os.Stderr, "Creating application")
-	myapp := app.NewGaiaApp(
+	gapp := app.NewGaiaApp(
 		ctx.Logger, appDB, traceStoreWriter, true, uint(1),
 		baseapp.SetPruning(store.PruneEverything), // nothing
 	)
@@ -109,7 +109,7 @@ func replayTxs(rootDir string) error {
 	}
 	// tmsm.SaveState(tmDB, genState)
 
-	cc := proxy.NewLocalClientCreator(myapp)
+	cc := proxy.NewLocalClientCreator(gapp)
 	proxyApp := proxy.NewAppConns(cc)
 	err = proxyApp.Start()
 	if err != nil {
@@ -150,12 +150,11 @@ func replayTxs(rootDir string) error {
 
 	// Create executor
 	fmt.Fprintln(os.Stderr, "Creating block executor")
-	blockExec := tmsm.NewBlockExecutor(tmDB, ctx.Logger, proxyApp.Consensus(),
-		tmsm.MockMempool{}, tmsm.MockEvidencePool{})
+	blockExec := tmsm.NewBlockExecutor(tmDB, ctx.Logger, proxyApp.Consensus(), nil, tmsm.MockEvidencePool{})
 
 	// Create block store
 	fmt.Fprintln(os.Stderr, "Creating block store")
-	blockStore := bcm.NewBlockStore(bcDB)
+	blockStore := tmstore.NewBlockStore(bcDB)
 
 	tz := []time.Duration{0, 0, 0}
 	for i := int(state.LastBlockHeight) + 1; ; i++ {

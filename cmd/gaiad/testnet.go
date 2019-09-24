@@ -3,6 +3,7 @@ package main
 // DONTCOVER
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -25,8 +26,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/auth/genaccounts"
+	authexported "github.com/cosmos/cosmos-sdk/x/auth/exported"
 	"github.com/cosmos/cosmos-sdk/x/genutil"
+	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	"github.com/cosmos/cosmos-sdk/x/staking"
 )
 
@@ -41,7 +43,8 @@ var (
 
 // get cmd to initialize all files for tendermint testnet and application
 func testnetCmd(ctx *server.Context, cdc *codec.Codec,
-	mbm module.BasicManager, genAccIterator genutil.GenesisAccountsIterator) *cobra.Command {
+	mbm module.BasicManager, genAccIterator genutiltypes.GenesisAccountsIterator,
+) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "testnet",
@@ -54,7 +57,7 @@ Note, strict routability for addresses is turned off in the config file.
 Example:
 	gaiad testnet --v 4 --output-dir ./output --starting-ip-address 192.168.10.2
 	`,
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			config := ctx.Config
 
 			outputDir := viper.GetString(flagOutputDir)
@@ -66,8 +69,8 @@ Example:
 			startingIPAddress := viper.GetString(flagStartingIPAddress)
 			numValidators := viper.GetInt(flagNumValidators)
 
-			return InitTestnet(config, cdc, mbm, genAccIterator, outputDir, chainID, minGasPrices,
-				nodeDirPrefix, nodeDaemonHome, nodeCLIHome, startingIPAddress, numValidators)
+			return InitTestnet(cmd, config, cdc, mbm, genAccIterator, outputDir, chainID,
+				minGasPrices, nodeDirPrefix, nodeDaemonHome, nodeCLIHome, startingIPAddress, numValidators)
 		},
 	}
 
@@ -94,8 +97,8 @@ Example:
 const nodeDirPerm = 0755
 
 // Initialize the testnet
-func InitTestnet(config *tmconfig.Config, cdc *codec.Codec, mbm module.BasicManager,
-	genAccIterator genutil.GenesisAccountsIterator,
+func InitTestnet(cmd *cobra.Command, config *tmconfig.Config, cdc *codec.Codec,
+	mbm module.BasicManager, genAccIterator genutiltypes.GenesisAccountsIterator,
 	outputDir, chainID, minGasPrices, nodeDirPrefix, nodeDaemonHome,
 	nodeCLIHome, startingIPAddress string, numValidators int) error {
 
@@ -111,8 +114,8 @@ func InitTestnet(config *tmconfig.Config, cdc *codec.Codec, mbm module.BasicMana
 	gaiaConfig.MinGasPrices = minGasPrices
 
 	var (
-		accs     []genaccounts.GenesisAccount
-		genFiles []string
+		genAccounts []authexported.GenesisAccount
+		genFiles    []string
 	)
 
 	// generate private keys, node IDs, and initial transactions
@@ -123,15 +126,14 @@ func InitTestnet(config *tmconfig.Config, cdc *codec.Codec, mbm module.BasicMana
 		gentxsDir := filepath.Join(outputDir, "gentxs")
 
 		config.SetRoot(nodeDir)
+		config.RPC.ListenAddress = "tcp://0.0.0.0:26657"
 
-		err := os.MkdirAll(filepath.Join(nodeDir, "config"), nodeDirPerm)
-		if err != nil {
+		if err := os.MkdirAll(filepath.Join(nodeDir, "config"), nodeDirPerm); err != nil {
 			_ = os.RemoveAll(outputDir)
 			return err
 		}
 
-		err = os.MkdirAll(clientDir, nodeDirPerm)
-		if err != nil {
+		if err := os.MkdirAll(clientDir, nodeDirPerm); err != nil {
 			_ = os.RemoveAll(outputDir)
 			return err
 		}
@@ -154,7 +156,7 @@ func InitTestnet(config *tmconfig.Config, cdc *codec.Codec, mbm module.BasicMana
 		memo := fmt.Sprintf("%s@%s:26656", nodeIDs[i], ip)
 		genFiles = append(genFiles, config.GenesisFile())
 
-		buf := client.BufferStdin()
+		buf := bufio.NewReader(cmd.InOrStdin())
 		prompt := fmt.Sprintf(
 			"Password for account '%s' (default %s):", nodeDirName, client.DefaultKeyPass,
 		)
@@ -185,34 +187,33 @@ func InitTestnet(config *tmconfig.Config, cdc *codec.Codec, mbm module.BasicMana
 		}
 
 		// save private key seed words
-		err = writeFile(fmt.Sprintf("%v.json", "key_seed"), clientDir, cliPrint)
-		if err != nil {
+		if err := writeFile(fmt.Sprintf("%v.json", "key_seed"), clientDir, cliPrint); err != nil {
 			return err
 		}
 
 		accTokens := sdk.TokensFromConsensusPower(1000)
 		accStakingTokens := sdk.TokensFromConsensusPower(500)
-		accs = append(accs, genaccounts.GenesisAccount{
-			Address: addr,
-			Coins: sdk.Coins{
-				sdk.NewCoin(fmt.Sprintf("%stoken", nodeDirName), accTokens),
-				sdk.NewCoin(sdk.DefaultBondDenom, accStakingTokens),
-			},
-		})
+		coins := sdk.Coins{
+			sdk.NewCoin(fmt.Sprintf("%stoken", nodeDirName), accTokens),
+			sdk.NewCoin(sdk.DefaultBondDenom, accStakingTokens),
+		}
+		genAccounts = append(genAccounts, auth.NewBaseAccount(addr, coins.Sort(), nil, 0, 0))
 
 		valTokens := sdk.TokensFromConsensusPower(100)
 		msg := staking.NewMsgCreateValidator(
 			sdk.ValAddress(addr),
 			valPubKeys[i],
 			sdk.NewCoin(sdk.DefaultBondDenom, valTokens),
-			staking.NewDescription(nodeDirName, "", "", ""),
+			staking.NewDescription(nodeDirName, "", "", "", ""),
 			staking.NewCommissionRates(sdk.ZeroDec(), sdk.ZeroDec(), sdk.ZeroDec()),
 			sdk.OneInt(),
 		)
+
 		kb, err := keys.NewKeyBaseFromDir(clientDir)
 		if err != nil {
 			return err
 		}
+
 		tx := auth.NewStdTx([]sdk.Msg{msg}, auth.StdFee{}, []auth.StdSignature{}, memo)
 		txBldr := auth.NewTxBuilderFromCLI().WithChainID(chainID).WithMemo(memo).WithKeybase(kb)
 
@@ -229,8 +230,7 @@ func InitTestnet(config *tmconfig.Config, cdc *codec.Codec, mbm module.BasicMana
 		}
 
 		// gather gentxs folder
-		err = writeFile(fmt.Sprintf("%v.json", nodeDirName), gentxsDir, txBytes)
-		if err != nil {
+		if err := writeFile(fmt.Sprintf("%v.json", nodeDirName), gentxsDir, txBytes); err != nil {
 			_ = os.RemoveAll(outputDir)
 			return err
 		}
@@ -241,7 +241,7 @@ func InitTestnet(config *tmconfig.Config, cdc *codec.Codec, mbm module.BasicMana
 		srvconfig.WriteConfigFile(gaiaConfigFilePath, gaiaConfig)
 	}
 
-	if err := initGenFiles(cdc, mbm, chainID, accs, genFiles, numValidators); err != nil {
+	if err := initGenFiles(cdc, mbm, chainID, genAccounts, genFiles, numValidators); err != nil {
 		return err
 	}
 
@@ -253,17 +253,23 @@ func InitTestnet(config *tmconfig.Config, cdc *codec.Codec, mbm module.BasicMana
 		return err
 	}
 
-	fmt.Printf("Successfully initialized %d node directories\n", numValidators)
+	cmd.PrintErrf("Successfully initialized %d node directories\n", numValidators)
 	return nil
 }
 
-func initGenFiles(cdc *codec.Codec, mbm module.BasicManager, chainID string,
-	accs []genaccounts.GenesisAccount, genFiles []string, numValidators int) error {
+func initGenFiles(
+	cdc *codec.Codec, mbm module.BasicManager, chainID string,
+	genAccounts []authexported.GenesisAccount, genFiles []string, numValidators int,
+) error {
 
 	appGenState := mbm.DefaultGenesis()
 
 	// set the accounts in the genesis state
-	appGenState = genaccounts.SetGenesisStateInAppState(cdc, appGenState, accs)
+	authDataBz := appGenState[auth.ModuleName]
+	var authGenState auth.GenesisState
+	cdc.MustUnmarshalJSON(authDataBz, &authGenState)
+	authGenState.Accounts = genAccounts
+	appGenState[auth.ModuleName] = cdc.MustMarshalJSON(authGenState)
 
 	appGenStateJSON, err := codec.MarshalJSONIndent(cdc, appGenState)
 	if err != nil {
@@ -289,7 +295,7 @@ func collectGenFiles(
 	cdc *codec.Codec, config *tmconfig.Config, chainID string,
 	monikers, nodeIDs []string, valPubKeys []crypto.PubKey,
 	numValidators int, outputDir, nodeDirPrefix, nodeDaemonHome string,
-	genAccIterator genutil.GenesisAccountsIterator) error {
+	genAccIterator genutiltypes.GenesisAccountsIterator) error {
 
 	var appState json.RawMessage
 	genTime := tmtime.Now()
@@ -324,8 +330,7 @@ func collectGenFiles(
 		genFile := config.GenesisFile()
 
 		// overwrite each validator's genesis file to have a canonical genesis time
-		err = genutil.ExportGenesisFileWithTime(genFile, chainID, nil, appState, genTime)
-		if err != nil {
+		if err := genutil.ExportGenesisFileWithTime(genFile, chainID, nil, appState, genTime); err != nil {
 			return err
 		}
 	}

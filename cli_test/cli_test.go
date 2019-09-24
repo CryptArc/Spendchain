@@ -25,7 +25,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/tests"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/auth/genaccounts"
 	"github.com/cosmos/cosmos-sdk/x/gov"
 	"github.com/cosmos/cosmos-sdk/x/mint"
 )
@@ -105,8 +104,9 @@ func TestGaiaCLIMinimumFees(t *testing.T) {
 	barAddr := f.KeyAddress(keyBar)
 
 	// Send a transaction that will get rejected
-	success, _, _ := f.TxSend(keyFoo, barAddr, sdk.NewInt64Coin(fee2Denom, 10), "-y")
-	require.False(f.T, success)
+	success, stdOut, _ := f.TxSend(keyFoo, barAddr, sdk.NewInt64Coin(fee2Denom, 10), "-y")
+	require.Contains(t, stdOut, "insufficient fees")
+	require.True(f.T, success)
 	tests.WaitForNextNBlocksTM(1, f.Port)
 
 	// Ensure tx w/ correct fees pass
@@ -118,7 +118,8 @@ func TestGaiaCLIMinimumFees(t *testing.T) {
 	// Ensure tx w/ improper fees fails
 	txFees = fmt.Sprintf("--fees=%s", sdk.NewInt64Coin(feeDenom, 1))
 	success, _, _ = f.TxSend(keyFoo, barAddr, sdk.NewInt64Coin(fooDenom, 10), txFees, "-y")
-	require.False(f.T, success)
+	require.Contains(t, stdOut, "insufficient fees")
+	require.True(f.T, success)
 
 	// Cleanup testing directories
 	f.Cleanup()
@@ -137,10 +138,11 @@ func TestGaiaCLIGasPrices(t *testing.T) {
 
 	// insufficient gas prices (tx fails)
 	badGasPrice, _ := sdk.NewDecFromStr("0.000003")
-	success, _, _ := f.TxSend(
+	success, stdOut, _ := f.TxSend(
 		keyFoo, barAddr, sdk.NewInt64Coin(fooDenom, 50),
 		fmt.Sprintf("--gas-prices=%s", sdk.NewDecCoinFromDec(feeDenom, badGasPrice)), "-y")
-	require.False(t, success)
+	require.Contains(t, stdOut, "insufficient fees")
+	require.True(t, success)
 
 	// wait for a block confirmation
 	tests.WaitForNextNBlocksTM(1, f.Port)
@@ -188,10 +190,11 @@ func TestGaiaCLIFeesDeduction(t *testing.T) {
 
 	// insufficient funds (coins + fees) tx fails
 	largeCoins := sdk.TokensFromConsensusPower(10000000)
-	success, _, _ = f.TxSend(
+	success, stdOut, _ := f.TxSend(
 		keyFoo, barAddr, sdk.NewCoin(fooDenom, largeCoins),
 		fmt.Sprintf("--fees=%s", sdk.NewInt64Coin(feeDenom, 2)), "-y")
-	require.False(t, success)
+	require.Contains(t, stdOut, "insufficient account funds")
+	require.True(t, success)
 
 	// Wait for a block
 	tests.WaitForNextNBlocksTM(1, f.Port)
@@ -278,43 +281,6 @@ func TestGaiaCLISend(t *testing.T) {
 	f.Cleanup()
 }
 
-func TestGaiaCLIConfirmTx(t *testing.T) {
-	t.Parallel()
-	f := InitFixtures(t)
-
-	// start gaiad server
-	proc := f.GDStart()
-	defer proc.Stop(false)
-
-	// Save key addresses for later use
-	fooAddr := f.KeyAddress(keyFoo)
-	barAddr := f.KeyAddress(keyBar)
-
-	fooAcc := f.QueryAccount(fooAddr)
-	startTokens := sdk.TokensFromConsensusPower(50)
-	require.Equal(t, startTokens, fooAcc.GetCoins().AmountOf(denom))
-
-	// send some tokens from one account to the other
-	sendTokens := sdk.TokensFromConsensusPower(10)
-	f.txSendWithConfirm(keyFoo, barAddr, sdk.NewCoin(denom, sendTokens), "Y")
-	tests.WaitForNextNBlocksTM(1, f.Port)
-
-	// ensure account balances match expected
-	barAcc := f.QueryAccount(barAddr)
-	require.Equal(t, sendTokens, barAcc.GetCoins().AmountOf(denom))
-
-	// send some tokens from one account to the other (cancelling confirmation)
-	f.txSendWithConfirm(keyFoo, barAddr, sdk.NewCoin(denom, sendTokens), "n")
-	tests.WaitForNextNBlocksTM(1, f.Port)
-
-	// ensure account balances match expected
-	barAcc = f.QueryAccount(barAddr)
-	require.Equal(t, sendTokens, barAcc.GetCoins().AmountOf(denom))
-
-	// Cleanup testing directories
-	f.Cleanup()
-}
-
 func TestGaiaCLIGasAuto(t *testing.T) {
 	t.Parallel()
 	f := InitFixtures(t)
@@ -332,8 +298,9 @@ func TestGaiaCLIGasAuto(t *testing.T) {
 
 	// Test failure with auto gas disabled and very little gas set by hand
 	sendTokens := sdk.TokensFromConsensusPower(10)
-	success, _, _ := f.TxSend(keyFoo, barAddr, sdk.NewCoin(denom, sendTokens), "--gas=10", "-y")
-	require.False(t, success)
+	success, stdOut, _ := f.TxSend(keyFoo, barAddr, sdk.NewCoin(denom, sendTokens), "--gas=10", "-y")
+	require.Contains(t, stdOut, "out of gas in location")
+	require.True(t, success)
 
 	// Check state didn't change
 	fooAcc = f.QueryAccount(fooAddr)
@@ -348,8 +315,9 @@ func TestGaiaCLIGasAuto(t *testing.T) {
 	require.Equal(t, startTokens, fooAcc.GetCoins().AmountOf(denom))
 
 	// Test failure with 0 gas
-	success, _, _ = f.TxSend(keyFoo, barAddr, sdk.NewCoin(denom, sendTokens), "--gas=0", "-y")
-	require.False(t, success)
+	success, stdOut, _ = f.TxSend(keyFoo, barAddr, sdk.NewCoin(denom, sendTokens), "--gas=0", "-y")
+	require.Contains(t, stdOut, "out of gas in location")
+	require.True(t, success)
 
 	// Check state didn't change
 	fooAcc = f.QueryAccount(fooAddr)
@@ -479,6 +447,23 @@ func TestGaiaCLIQueryRewards(t *testing.T) {
 	f.Cleanup()
 }
 
+func TestGaiaCLIQuerySupply(t *testing.T) {
+	t.Parallel()
+	f := InitFixtures(t)
+
+	// start gaiad server
+	proc := f.GDStart()
+	defer proc.Stop(false)
+
+	totalSupply := f.QueryTotalSupply()
+	totalSupplyOf := f.QueryTotalSupplyOf(fooDenom)
+
+	require.Equal(t, totalCoins, totalSupply)
+	require.True(sdk.IntEq(t, totalCoins.AmountOf(fooDenom), totalSupplyOf))
+
+	f.Cleanup()
+}
+
 func TestGaiaCLISubmitProposal(t *testing.T) {
 	t.Parallel()
 	f := InitFixtures(t)
@@ -520,7 +505,7 @@ func TestGaiaCLISubmitProposal(t *testing.T) {
 	tests.WaitForNextNBlocksTM(1, f.Port)
 
 	// Ensure transaction tags can be queried
-	searchResult := f.QueryTxs(1, 50, "action:submit_proposal", fmt.Sprintf("sender:%s", fooAddr))
+	searchResult := f.QueryTxs(1, 50, "message.action:submit_proposal", fmt.Sprintf("message.sender:%s", fooAddr))
 	require.Len(t, searchResult.Txs, 1)
 
 	// Ensure deposit was deducted
@@ -564,7 +549,7 @@ func TestGaiaCLISubmitProposal(t *testing.T) {
 	require.Equal(t, proposalTokens.Add(depositTokens), deposit.Amount.AmountOf(denom))
 
 	// Ensure tags are set on the transaction
-	searchResult = f.QueryTxs(1, 50, "action:deposit", fmt.Sprintf("sender:%s", fooAddr))
+	searchResult = f.QueryTxs(1, 50, "message.action:deposit", fmt.Sprintf("message.sender:%s", fooAddr))
 	require.Len(t, searchResult.Txs, 1)
 
 	// Ensure account has expected amount of funds
@@ -601,7 +586,7 @@ func TestGaiaCLISubmitProposal(t *testing.T) {
 	require.Equal(t, gov.OptionYes, votes[0].Option)
 
 	// Ensure tags are applied to voting transaction properly
-	searchResult = f.QueryTxs(1, 50, "action:vote", fmt.Sprintf("sender:%s", fooAddr))
+	searchResult = f.QueryTxs(1, 50, "message.action:vote", fmt.Sprintf("message.sender:%s", fooAddr))
 	require.Len(t, searchResult.Txs, 1)
 
 	// Ensure no proposals in deposit period
@@ -663,7 +648,7 @@ func TestGaiaCLISubmitParamChangeProposal(t *testing.T) {
 	tests.WaitForNextNBlocksTM(1, f.Port)
 
 	// ensure transaction tags can be queried
-	txsPage := f.QueryTxs(1, 50, "action:submit_proposal", fmt.Sprintf("sender:%s", fooAddr))
+	txsPage := f.QueryTxs(1, 50, "message.action:submit_proposal", fmt.Sprintf("message.sender:%s", fooAddr))
 	require.Len(t, txsPage.Txs, 1)
 
 	// ensure deposit was deducted
@@ -747,7 +732,7 @@ func TestGaiaCLISubmitCommunityPoolSpendProposal(t *testing.T) {
 	tests.WaitForNextNBlocksTM(1, f.Port)
 
 	// ensure transaction tags can be queried
-	txsPage := f.QueryTxs(1, 50, "action:submit_proposal", fmt.Sprintf("sender:%s", fooAddr))
+	txsPage := f.QueryTxs(1, 50, "message.action:submit_proposal", fmt.Sprintf("message.sender:%s", fooAddr))
 	require.Len(t, txsPage.Txs, 1)
 
 	// ensure deposit was deducted
@@ -792,33 +777,30 @@ func TestGaiaCLIQueryTxPagination(t *testing.T) {
 	}
 
 	// perPage = 15, 2 pages
-	txsPage1 := f.QueryTxs(1, 15, fmt.Sprintf("sender:%s", fooAddr))
+	txsPage1 := f.QueryTxs(1, 15, fmt.Sprintf("message.sender:%s", fooAddr))
 	require.Len(t, txsPage1.Txs, 15)
 	require.Equal(t, txsPage1.Count, 15)
-	txsPage2 := f.QueryTxs(2, 15, fmt.Sprintf("sender:%s", fooAddr))
+	txsPage2 := f.QueryTxs(2, 15, fmt.Sprintf("message.sender:%s", fooAddr))
 	require.Len(t, txsPage2.Txs, 15)
 	require.NotEqual(t, txsPage1.Txs, txsPage2.Txs)
-	txsPage3 := f.QueryTxs(3, 15, fmt.Sprintf("sender:%s", fooAddr))
-	require.Len(t, txsPage3.Txs, 15)
-	require.Equal(t, txsPage2.Txs, txsPage3.Txs)
 
 	// perPage = 16, 2 pages
-	txsPage1 = f.QueryTxs(1, 16, fmt.Sprintf("sender:%s", fooAddr))
+	txsPage1 = f.QueryTxs(1, 16, fmt.Sprintf("message.sender:%s", fooAddr))
 	require.Len(t, txsPage1.Txs, 16)
-	txsPage2 = f.QueryTxs(2, 16, fmt.Sprintf("sender:%s", fooAddr))
+	txsPage2 = f.QueryTxs(2, 16, fmt.Sprintf("message.sender:%s", fooAddr))
 	require.Len(t, txsPage2.Txs, 14)
 	require.NotEqual(t, txsPage1.Txs, txsPage2.Txs)
 
 	// perPage = 50
-	txsPageFull := f.QueryTxs(1, 50, fmt.Sprintf("sender:%s", fooAddr))
+	txsPageFull := f.QueryTxs(1, 50, fmt.Sprintf("message.sender:%s", fooAddr))
 	require.Len(t, txsPageFull.Txs, 30)
 	require.Equal(t, txsPageFull.Txs, append(txsPage1.Txs, txsPage2.Txs...))
 
 	// perPage = 0
-	f.QueryTxsInvalid(errors.New("ERROR: page must greater than 0"), 0, 50, fmt.Sprintf("sender:%s", fooAddr))
+	f.QueryTxsInvalid(errors.New("ERROR: page must greater than 0"), 0, 50, fmt.Sprintf("message.sender:%s", fooAddr))
 
 	// limit = 0
-	f.QueryTxsInvalid(errors.New("ERROR: limit must greater than 0"), 1, 0, fmt.Sprintf("sender:%s", fooAddr))
+	f.QueryTxsInvalid(errors.New("ERROR: limit must greater than 0"), 1, 0, fmt.Sprintf("message.sender:%s", fooAddr))
 
 	// Cleanup testing directories
 	f.Cleanup()
@@ -1003,8 +985,9 @@ func TestGaiaCLIMultisignInsufficientCosigners(t *testing.T) {
 	require.False(t, success)
 
 	// Broadcast the transaction
-	success, _, _ = f.TxBroadcast(signedTxFile.Name())
-	require.False(t, success)
+	success, stdOut, _ := f.TxBroadcast(signedTxFile.Name())
+	require.Contains(t, stdOut, "signature verification failed")
+	require.True(t, success)
 
 	// Cleanup testing directories
 	f.Cleanup()
@@ -1288,12 +1271,12 @@ func TestGaiadAddGenesisAccount(t *testing.T) {
 	genesisState := f.GenesisState()
 
 	cdc := app.MakeCodec()
-	accounts := genaccounts.GetGenesisStateFromAppState(cdc, genesisState)
+	accounts := auth.GetGenesisStateFromAppState(cdc, genesisState).Accounts
 
-	require.Equal(t, accounts[0].Address, f.KeyAddress(keyFoo))
-	require.Equal(t, accounts[1].Address, f.KeyAddress(keyBar))
-	require.True(t, accounts[0].Coins.IsEqual(startCoins))
-	require.True(t, accounts[1].Coins.IsEqual(bazCoins))
+	require.Equal(t, accounts[0].GetAddress(), f.KeyAddress(keyFoo))
+	require.Equal(t, accounts[1].GetAddress(), f.KeyAddress(keyBar))
+	require.True(t, accounts[0].GetCoins().IsEqual(startCoins))
+	require.True(t, accounts[1].GetCoins().IsEqual(bazCoins))
 
 	// Cleanup testing directories
 	f.Cleanup()
