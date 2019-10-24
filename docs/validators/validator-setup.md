@@ -1,10 +1,10 @@
-# Run a Validator on the Cosmos Hub Mainnet
+# Run a Validator on the Spend Hub testnet
 
 ::: tip
-Information on how to join the mainnet (`genesis.json` file and seeds) is held [in our `launch` repo](https://github.com/cosmos/launch/tree/master/latest). 
+Information on how to join the testnet (`genesis.json` file and seeds) is held [in our `launch` repo](https://github.com/cosmos/launch/tree/master/latest). 
 :::
 
-Before setting up your validator node, make sure you've already gone through the [Full Node Setup](../join-mainnet.md) guide.
+Before setting up your validator node, make sure you've already gone through the [Full Node Setup](../join-testnet.md) guide.
 
 If you plan to use a KMS (key management system), you should go through these steps first: [Using a KMS](kms/kms.md).
 
@@ -13,29 +13,29 @@ If you plan to use a KMS (key management system), you should go through these st
 [Validators](./overview.md) are responsible for committing new blocks to the blockchain through voting. A validator's stake is slashed if they become unavailable or sign blocks at the same height. Please read about [Sentry Node Architecture](./validator-faq.md#how-can-validators-protect-themselves-from-denial-of-service-attacks) to protect your node from DDOS attacks and to ensure high-availability.
 
 ::: danger Warning
-If you want to become a validator for the Hub's `mainnet`, you should [research security](./security.md).
+If you want to become a validator for the Hub's `testnet`, you should [research security](./security.md).
 :::
 
-You may want to skip the next section if you have already [set up a full-node](../join-mainnet.md).
+You may want to skip the next section if you have already [set up a full-node](../join-testnet.md).
 
 ## Create Your Validator
 
 Your `cosmosvalconspub` can be used to create a new validator by staking tokens. You can find your validator pubkey by running:
 
 ```bash
-gaiad tendermint show-validator
+spend tendermint show-validator
 ```
 
 To create your validator, just use the following command:
 
 ::: warning 
-Don't use more `uatom` than you have! 
+Don't use more `ustaking` than you have! 
 :::
 
 ```bash
-gaiacli tx staking create-validator \
-  --amount=1000000uatom \
-  --pubkey=$(gaiad tendermint show-validator) \
+spendcli tx staking create-validator \
+  --amount=1000000ustaking \
+  --pubkey=$(spend tendermint show-validator) \
   --moniker="choose a moniker" \
   --chain-id=<chain_id> \
   --commission-rate="0.10" \
@@ -43,7 +43,7 @@ gaiacli tx staking create-validator \
   --commission-max-change-rate="0.01" \
   --min-self-delegation="1" \
   --gas="auto" \
-  --gas-prices="0.025uatom" \
+  --gas-prices="0.025ustaking" \
   --from=<key_name>
 ```
 
@@ -52,7 +52,7 @@ When specifying commission parameters, the `commission-max-change-rate` is used 
 :::
 
 ::: tip
-`Min-self-delegation` is a stritly positive integer that represents the minimum amount of self-delegated voting power your validator must always have. A `min-self-delegation` of 1 means your validator will never have a self-delegation lower than `1atom`, or `1000000uatom`
+`Min-self-delegation` is a stritly positive integer that represents the minimum amount of self-delegated voting power your validator must always have. A `min-self-delegation` of 1 means your validator will never have a self-delegation lower than `1staking`, or `1000000ustaking`
 :::
 
 You can confirm that you are in the validator set by using a third party explorer.
@@ -60,7 +60,7 @@ You can confirm that you are in the validator set by using a third party explore
 ## Participate in Genesis as a Validator
 
 ::: warning
-The genesis ceremony for the Cosmos Hub mainnet is closed. Please skip to the next section.
+The genesis ceremony for the Spend Hub testnet is closed. Please skip to the next section.
 :::
 
 If you want to participate in genesis as a validator, you need to justify that
@@ -69,22 +69,22 @@ you have some stake at genesis, create one (or multiple) transactions to bond th
 Your `cosmosvalconspub` can be used to create a new validator by staking tokens. You can find your validator pubkey by running:
 
 ```bash
-gaiad tendermint show-validator
+spend tendermint show-validator
 ```
 
-Next, craft your `gaiad gentx` command. 
+Next, craft your `spend gentx` command. 
 
 ::: tip
 A `gentx` is a JSON file carrying a self-delegation. All genesis transactions are collected by a `genesis coordinator` and validated against an initial `genesis.json`.
 :::
 
 ::: warning Note
-Don't use more `uatom` than you have! 
+Don't use more `ustaking` than you have! 
 :::
 
 ```bash
-gaiad gentx \
-  --amount <amount_of_delegation_uatom> \
+spend gentx \
+  --amount <amount_of_delegation_ustaking> \
   --commission-rate <commission_rate> \
   --commission-max-rate <commission_max_rate> \
   --commission-max-change-rate <commission_max_change_rate> \
@@ -107,14 +107,14 @@ The <key_name> specifies which validator you are editing. If you choose to not i
 The `--identity` can be used as to verify identity with systems like Keybase or UPort. When using with Keybase `--identity` should be populated with a 16-digit string that is generated with a [keybase.io](https://keybase.io) account. It's a cryptographically secure method of verifying your identity across multiple online networks. The Keybase API allows us to retrieve your Keybase avatar. This is how you can add a logo to your validator profile.
 
 ```bash
-gaiacli tx staking edit-validator
+spendcli tx staking edit-validator
   --moniker="choose a moniker" \
   --website="https://cosmos.network" \
   --identity=6A0D65E29A4CBC8E \
   --details="To infinity and beyond!" \
   --chain-id=<chain_id> \
   --gas="auto" \
-  --gas-prices="0.025uatom" \
+  --gas-prices="0.025ustaking" \
   --from=<key_name> \
   --commission-rate="0.10"
 ```
@@ -131,7 +131,7 @@ __Note__: The `commission-rate` value must adhere to the following invariants:
 View the validator's information with this command:
 
 ```bash
-gaiacli query staking validator <account_cosmos>
+spendcli query staking validator <account_cosmos>
 ```
 
 ## Track Validator Signing Information
@@ -139,7 +139,7 @@ gaiacli query staking validator <account_cosmos>
 In order to keep track of a validator's signatures in the past you can do so by using the `signing-info` command:
 
 ```bash
-gaiacli query slashing signing-info <validator-pubkey>\
+spendcli query slashing signing-info <validator-pubkey>\
   --chain-id=<chain_id>
 ```
 
@@ -148,7 +148,7 @@ gaiacli query slashing signing-info <validator-pubkey>\
 When a validator is "jailed" for downtime, you must submit an `Unjail` transaction from the operator account in order to be able to get block proposer rewards again (depends on the zone fee distribution).
 
 ```bash
-gaiacli tx slashing unjail \
+spendcli tx slashing unjail \
 	--from=<key_name> \
 	--chain-id=<chain_id>
 ```
@@ -158,10 +158,10 @@ gaiacli tx slashing unjail \
 Your validator is active if the following command returns anything:
 
 ```bash
-gaiacli query tendermint-validator-set | grep "$(gaiad tendermint show-validator)"
+spendcli query tendermint-validator-set | grep "$(spend tendermint show-validator)"
 ```
 
-You should now see your validator in one of the Cosmos Hub explorers. You are looking for the `bech32` encoded `address` in the `~/.gaiad/config/priv_validator.json` file.
+You should now see your validator in one of the Spend Hub explorers. You are looking for the `bech32` encoded `address` in the `~/.spend/config/priv_validator.json` file.
 
 ::: warning Note
 To be in the validator set, you need to have more total voting power than the 100th validator.
@@ -172,7 +172,7 @@ To be in the validator set, you need to have more total voting power than the 10
 When attempting to perform routine maintenance or planning for an upcoming coordinated
 upgrade, it can be useful to have your validator systematically and gracefully halt.
 You can achieve this by either setting the `halt-height` to the height at which
-you want your node to shutdown or by passing the `--halt-height` flag to `gaiad`.
+you want your node to shutdown or by passing the `--halt-height` flag to `spend`.
 The node will shutdown with a zero exit code at that given height after committing
 the block.
 
@@ -182,10 +182,10 @@ the block.
 
 Your validator has become jailed. Validators get jailed, i.e. get removed from the active validator set, if they do not vote on `500` of the last `10000` blocks, or if they double sign. 
 
-If you got jailed for downtime, you can get your voting power back to your validator. First, if `gaiad` is not running, start it up again:
+If you got jailed for downtime, you can get your voting power back to your validator. First, if `spend` is not running, start it up again:
 
 ```bash
-gaiad start
+spend start
 ```
 
 Wait for your full node to catch up to the latest block. Then, you can [unjail your validator](#unjail-validator)
@@ -193,26 +193,26 @@ Wait for your full node to catch up to the latest block. Then, you can [unjail y
 Lastly, check your validator again to see if your voting power is back.
 
 ```bash
-gaiacli status
+spendcli status
 ```
 
 You may notice that your voting power is less than it used to be. That's because you got slashed for downtime!
 
-### Problem #2: My `gaiad` crashes because of `too many open files`
+### Problem #2: My `spend` crashes because of `too many open files`
 
-The default number of files Linux can open (per-process) is `1024`. `gaiad` is known to open more than `1024` files. This causes the process to crash. A quick fix is to run `ulimit -n 4096` (increase the number of open files allowed) and then restart the process with `gaiad start`. If you are using `systemd` or another process manager to launch `gaiad` this may require some configuration at that level. A sample `systemd` file to fix this issue is below:
+The default number of files Linux can open (per-process) is `1024`. `spend` is known to open more than `1024` files. This causes the process to crash. A quick fix is to run `ulimit -n 4096` (increase the number of open files allowed) and then restart the process with `spend start`. If you are using `systemd` or another process manager to launch `spend` this may require some configuration at that level. A sample `systemd` file to fix this issue is below:
 
 ```toml
-# /etc/systemd/system/gaiad.service
+# /etc/systemd/system/spend.service
 [Unit]
-Description=Cosmos Gaia Node
+Description=Spend Spend Node
 After=network.target
 
 [Service]
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu
-ExecStart=/home/ubuntu/go/bin/gaiad start
+ExecStart=/home/ubuntu/go/bin/spend start
 Restart=on-failure
 RestartSec=3
 LimitNOFILE=4096

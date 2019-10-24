@@ -1,24 +1,24 @@
-# Cosmos Hub Documentation
+# Spend Hub Documentation
 
-Welcome to the documentation of the **Cosmos Hub application: `gaia`**.
+Welcome to the documentation of the **Spend Hub application: `spend`**.
 
-## What is Gaia?
+## What is Spend?
 
-- [Gaia](./what-is-gaia.md)
+- [Spend](./what-is-spend.md)
 
-## Join the Cosmos Hub Mainnet
+## Join the Spend Hub testnet
 
-- [Install the `gaia` application](./installation.md)
-- [Set up a full node and join the mainnet](./join-mainnet.md)
+- [Install the `spend` application](./installation.md)
+- [Set up a full node and join the testnet](./join-testnet.md)
 - [Upgrade to a validator node](./validators/validator-setup.md)
 
-## Join the Cosmos Hub Public Testnet
+## Join the Spend Hub Public Testnet
 
 - [Join the testnet](./join-testnet.md)
 
-## Setup Your Own `gaia` Testnet
+## Setup Your Own `spend` Testnet
 
-- [Setup your own `gaia` testnet](./deploy-testnet.md)
+- [Setup your own `spend` testnet](./deploy-testnet.md)
 
 ## Additional Resources
 
@@ -29,7 +29,7 @@ Welcome to the documentation of the **Cosmos Hub application: `gaia`**.
 
 # Contribute
 
-See [this file](https://github.com/cosmos/gaia/blob/master/docs/DOCS_README.md) for details of the build process and
+See [this file](https://github.com/spend/Spendchain/blob/master/docs/DOCS_README.md) for details of the build process and
 considerations when making changes.
 
 # Version

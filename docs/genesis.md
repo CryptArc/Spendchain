@@ -1,14 +1,14 @@
 # Genesis File
 
-This document explains how the genesis file of the Cosmos Hub mainnet is structured. It also explains how you can build a genesis file for your own `gaia` testnet.
+This document explains how the genesis file of the Spend Hub testnet is structured. It also explains how you can build a genesis file for your own `spend` testnet.
 
 Note that you can generate a default genesis file for your own testnet by running the following command:
 
 ```bash
-gaiad init <moniker> --chain-id <chain-id>
+spend init <moniker> --chain-id <chain-id>
 ```
 
-The genesis file is stored in `~/.gaiad/config/genesis.toml`.
+The genesis file is stored in `~/.spend/config/genesis.toml`.
 
 ## What is a Genesis File
 
@@ -32,7 +32,7 @@ The `chain_id` is a unique identifier for your chain. It helps differentiate bet
 
 ## Consensus Parameters
 
-Next, the genesis file defines consensus parameters. Consensus parameters regroup all the parameters that are related to the consensus layer, which is `Tendermint` in the case of `gaia`. Let us look at these parameters:
+Next, the genesis file defines consensus parameters. Consensus parameters regroup all the parameters that are related to the consensus layer, which is `Tendermint` in the case of `spend`. Let us look at these parameters:
 
 - `block`
     + `max_bytes`: Maximum number of bytes per block. 
@@ -68,9 +68,9 @@ The application state defines the initial state of the state-machine.
 In this section, initial allocation of tokens is defined. It is possible to add accounts manually by directly editing the genesis file, but it is also possible to use the following command:
 
 ```bash
-// Example: gaiad add-genesis-account cosmos1qs8tnw2t8l6amtzvdemnnsq9dzk0ag0z37gh3h 10000000uatom
+// Example: spend add-genesis-account cosmos1qs8tnw2t8l6amtzvdemnnsq9dzk0ag0z37gh3h 10000000ustaking
 
-gaiad add-genesis-account <account-address> <amount><denom>
+spend add-genesis-account <account-address> <amount><denom>
 ```
 
 This command creates an item in the `accounts` list, under the `app_state` section.
@@ -81,7 +81,7 @@ This command creates an item in the `accounts` list, under the `app_state` secti
         "address": "cosmos1qs8tnw2t8l6amtzvdemnnsq9dzk0ag0z37gh3h",
         "coins": [
           {
-            "denom": "uatom",
+            "denom": "ustaking",
             "amount": "10000000"
           }
         ],
@@ -89,7 +89,7 @@ This command creates an item in the `accounts` list, under the `app_state` secti
         "account_number": "0",
         "original_vesting": [
           {
-            "denom": "uatom",
+            "denom": "ustaking",
             "amount": "26306000000"
           }
         ],
@@ -105,7 +105,7 @@ Let us break down the parameters:
 
 - `sequence_number`: This number is used to count the number of transactions sent by this account. It is incremented each time a transaction is included in a block, and used to prevent replay attacks. Initial value is `0`.
 - `account_number`: Unique identifier for the account. It is generated the first time a transaction including this account is included in a block.
-- `original_vesting`: Vesting is natively supported by `gaia`. You can define an amount of token owned by the account that needs to be vested for a period of time before they can be transferred. Vested tokens can be delegated. Default value is `null`.
+- `original_vesting`: Vesting is natively supported by `spend`. You can define an amount of token owned by the account that needs to be vested for a period of time before they can be transferred. Vested tokens can be delegated. Default value is `null`.
 - `delegated_free`: Amount of delegated tokens that can be transferred after they've been vested. Most of the time, will be `null` in genesis. 
 - `delegated_vesting`: Amount of delegated tokens that are still vesting. Most of the time, will be `null` in genesis.
 - `start_time`: Block at which the vesting period starts. `0` most of the time in genesis.
@@ -135,7 +135,7 @@ The `staking` module handles the bulk of the Proof-of-Stake logic of the state-m
         "unbonding_time": "1814400000000000",
         "max_validators": 100,
         "max_entries": 7,
-        "bond_denom": "uatom"
+        "bond_denom": "ustaking"
       },
       "last_total_power": "0",
       "last_validator_powers": null,
@@ -150,7 +150,7 @@ The `staking` module handles the bulk of the Proof-of-Stake logic of the state-m
 Let us break down the parameters:
 
 - `pool`
-    + `not_bonded_tokens`: Defines the amount of tokens not bonded (i.e. delegated) in genesis. Generally, it equals the total supply of the staking token (`uatom` in this example).
+    + `not_bonded_tokens`: Defines the amount of tokens not bonded (i.e. delegated) in genesis. Generally, it equals the total supply of the staking token (`ustaking` in this example).
     + `bonded_tokens`: Amount of bonded tokens in genesis. Generally `0`.
 - `params`
     + `unbonding_time`: Time in **nanosecond** it takes for tokens to complete unbonding. 
@@ -176,7 +176,7 @@ The `mint` module governs the logic of inflating the supply of token. The `mint`
         "annual_provisions": "0.000000000000000000"
       },
       "params": {
-        "mint_denom": "uatom",
+        "mint_denom": "ustaking",
         "inflation_rate_change": "0.130000000000000000",
         "inflation_max": "0.200000000000000000",
         "inflation_min": "0.070000000000000000",
@@ -201,10 +201,10 @@ Let us break down the parameters:
 
 ### Distribution
 
-The `distribution` module handles the logic of distribution block provisions and fees to validators and delegators. The `distribution` section in the genesis file looks like the follwing:
+The `distr` module handles the logic of distribution block provisions and fees to validators and delegators. The `distr` section in the genesis file looks like the follwing:
 
 ```json
-    "distribution": {
+    "distr": {
       "fee_pool": {
         "community_pool": null
       },
@@ -235,8 +235,8 @@ Let us break down the parameters:
 - `previous_proposer`: Proposer of the previous block. Set to `""` if genesis was not exported from previous state.
 - `outstanding_rewards`: Outstanding (un-withdrawn) rewards. Set to `null` if genesis was not exported from previous state.
 - `validator_accumulated_commission`: Outstanding (un-withdrawn) commission of validators. Set to `null` if genesis was not exported from previous state.
-- `validator_historical_rewards`: Set of information related to the historical rewards of validators and used by the `distribution` module for various computation. Set to `null` if genesis was not exported from previous state. 
-- `validators_current_rewards`: Set of information related to the current rewards of validators and used by the `distribution` module for various computation. Set to `null` if genesis was not exported from previous state.
+- `validator_historical_rewards`: Set of information related to the historical rewards of validators and used by the `distr` module for various computation. Set to `null` if genesis was not exported from previous state. 
+- `validators_current_rewards`: Set of information related to the current rewards of validators and used by the `distr` module for various computation. Set to `null` if genesis was not exported from previous state.
 - `delegator_starting_infos`: Tracks the previous validator period, the delegation's amount of staking token, and the creation height (to check later on if any slashes have occurred). Set to `null` if genesis was not exported from previous state.
 - `validator_slash_events`: Set of information related to the past slashing of validators. Set to `null` if genesis was not exported from previous state.
 
@@ -253,7 +253,7 @@ The `gov` module handles all governance-related transactions. The initial state 
       "deposit_params": {
         "min_deposit": [
           {
-            "denom": "uatom",
+            "denom": "ustaking",
             "amount": "512000000"
           }
         ],
@@ -326,7 +326,7 @@ By default, the genesis file do not contain any `gentxs`. A `gentx` is a transac
 A `gentx` can be added manually to the genesis file, or via the following command:
 
 ```bash
-gaiad collect-gentxs
+spend collect-gentxs
 ```
 
-This command will add all the `gentxs` stored in `~/.gaiad/config/gentx` to the genesis file. In order to create a genesis transaction, click [here](./validators/validator-setup.md#participate-in-genesis-as-a-validator).
+This command will add all the `gentxs` stored in `~/.spend/config/gentx` to the genesis file. In order to create a genesis transaction, click [here](./validators/validator-setup.md#participate-in-genesis-as-a-validator).
