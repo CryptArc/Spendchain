@@ -75,6 +75,10 @@
       "missed_blocks": {}
     },
     "staking": {
+      "pool": {
+        "not_bonded_tokens": "4000000000",
+        "bonded_tokens": "0"
+      },
       "params": {
         "unbonding_time": "1814400000000000",
         "max_validators": 100,
