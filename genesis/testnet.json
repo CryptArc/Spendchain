@@ -81,7 +81,7 @@
       },
       "params": {
         "unbonding_time": "1814400000000000",
-        "max_validators": 100,
+        "max_validators": 21,
         "max_entries": 7,
         "bond_denom": "spend"
       },
@@ -189,7 +189,7 @@
         "inflation_max": "0.200000000000000000",
         "inflation_min": "0.070000000000000000",
         "goal_bonded": "0.670000000000000000",
-        "blocks_per_year": "6311520"
+        "blocks_per_year": "31104000"
       }
     }
   }
