@@ -14,8 +14,8 @@ sudo snap install go --classic
 
 ### Install Cosmos SDK & Spend
 ```
-git clone https://github.com/cosmos/gaia
-cd gaia/
+git clone https://github.com/Spend/Spendchain
+cd Spendchain/
 make build-linux
 ```
 ### Add the builds to alliases
@@ -32,7 +32,7 @@ spend start
 Copy the genesis to your config folder
 There is a spendcli and spend daemon configuration folders located at ./spend 
 
-``` cp genesis/genesis.json ~/.spend/config ```
+``` cp genesis/testnet.json ~/.spend/config/genesis.json ```
 
 Use spendcli to interact with the blockchain
 
